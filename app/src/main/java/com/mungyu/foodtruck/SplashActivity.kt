@@ -77,6 +77,9 @@ class SplashActivity : AppCompatActivity() {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (snapshot.children.count() > 0 && name == "unknown") {
                         val userRef = FirebaseDatabase.getInstance().reference.child("users").push()
+                        val editor = pref.edit()
+                        editor.putString("key", userRef.key)
+                        editor.commit()
                         userRef.setValue(
                             User(
                                 name = auth.currentUser?.displayName,

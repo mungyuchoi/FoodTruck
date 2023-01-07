@@ -1,9 +1,13 @@
 package com.mungyu.foodtruck
 
 import android.Manifest
+import android.content.Intent
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -14,6 +18,7 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -27,6 +32,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var map: GoogleMap
     private lateinit var binding: ActivityMapsBinding
     private var isCallCurrentPosition = false
+    private lateinit var persistentBottomSheetBehavior: BottomSheetBehavior<*>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +44,36 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         initFirebase()
         initPermission()
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            CALLBACK_REGISTER -> {
+                persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+                binding.bottomSheetPersistent.title.text = ""
+                binding.bottomSheetPersistent.description.text = ""
+            }
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.maps, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.register -> {
+                val intent = Intent(this, RegisterActivity::class.java).apply {
+                    putExtra(Const.CENTER_LATITUDE, map.cameraPosition.target.latitude)
+                    putExtra(Const.CENTER_LONGITUDE, map.cameraPosition.target.longitude)
+                }
+                startActivityForResult(intent, CALLBACK_REGISTER)
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
 
     private fun initFirebase() {
         val auth = FirebaseAuth.getInstance()
@@ -51,6 +87,22 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+
+        persistentBottomSheetBehavior = BottomSheetBehavior.from(binding.bottomSheetPersistent.bottomSheetPersistent)
+        persistentBottomSheetBehavior.run {
+            setBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+                override fun onStateChanged(p0: View, state: Int) {
+                    when (state) {
+                        BottomSheetBehavior.STATE_EXPANDED -> {
+
+                        }
+                    }
+                }
+
+                override fun onSlide(p0: View, p1: Float) {
+                }
+            })
+        }
     }
 
     private fun initPermission() {
@@ -148,6 +200,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     companion object {
         const val TAG = "FoodTruckMaps"
         const val PERMISSIONS_REQUEST_CODE = 100
+        val CALLBACK_REGISTER = 9002
         var REQUIRED_PERMISSIONS = arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
