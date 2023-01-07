@@ -1,10 +1,12 @@
 package com.mungyu.foodtruck
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.trusted.sharing.ShareTarget.FileFormField.KEY_NAME
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -12,6 +14,11 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import com.mungyu.foodtruck.model.User
 
 class SplashActivity : AppCompatActivity() {
     private var SPLASH_TIME = 500L
@@ -20,7 +27,6 @@ class SplashActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash)
-
         initFirebase()
     }
 
@@ -53,11 +59,37 @@ class SplashActivity : AppCompatActivity() {
         auth?.signInWithCredential(credential).addOnCompleteListener(this) { task ->
             if (task.isSuccessful) {
                 Toast.makeText(this@SplashActivity, "환영합니다.", Toast.LENGTH_SHORT).show()
+                registerUserInfo()
                 nextStep()
             } else {
                 Toast.makeText(this@SplashActivity, "Login 실패", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun registerUserInfo() {
+        val pref =
+            applicationContext.getSharedPreferences(FOOD_TRUCK, Context.MODE_PRIVATE)
+        val name = pref.getString(KEY_NAME, "unknown")
+        val userRef = FirebaseDatabase.getInstance().reference.child("users")
+        userRef.orderByChild("email").equalTo(auth.currentUser?.email)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.children.count() > 0 && name == "unknown") {
+                        val userRef = FirebaseDatabase.getInstance().reference.child("users").push()
+                        userRef.setValue(
+                            User(
+                                name = auth.currentUser?.displayName,
+                                imageUrl = auth.currentUser?.photoUrl.toString(),
+                                email = auth.currentUser?.email
+                            )
+                        )
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                }
+            })
     }
 
     private fun initFirebase() {
@@ -93,7 +125,7 @@ class SplashActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val TAG = "SplashActivity"
+        const val TAG = "FoodTruckSplash"
         const val RC_SIGN_IN = 9001
     }
 }
