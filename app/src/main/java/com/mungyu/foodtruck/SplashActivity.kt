@@ -67,6 +67,7 @@ class SplashActivity : AppCompatActivity() {
             .build()
         val client = GoogleSignIn.getClient(application, gso)
         auth = FirebaseAuth.getInstance().apply {
+            Log.d(TAG, "initFirebase currentUser:$currentUser")
             if (currentUser == null) {
                 startActivityForResult(client.signInIntent, RC_SIGN_IN)
             } else {
