@@ -11,15 +11,20 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.mungyu.foodtruck.databinding.ActivityMapsBinding
 import com.tbruyelle.rxpermissions3.RxPermissions
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    private lateinit var mMap: GoogleMap
+    private lateinit var map: GoogleMap
     private lateinit var binding: ActivityMapsBinding
     private var isCallCurrentPosition = false
 
@@ -66,8 +71,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                                 "onLocationChanged" + location.latitude + "," + location.longitude
                             )
                             val current = LatLng(location.latitude, location.longitude)
-                            mMap.addMarker(MarkerOptions().position(current).title("현재 위치"))
-                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(current, 15f))
+                            map.addMarker(MarkerOptions().position(current).title("현재 위치"))
+                            map.moveCamera(CameraUpdateFactory.newLatLngZoom(current, 15f))
                             isCallCurrentPosition = true
                         }
                     })
@@ -79,16 +84,37 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onMapReady(googleMap: GoogleMap) {
         Log.d(TAG, "onMapReady")
-        mMap = googleMap
-    }
-
-    private fun loadLocationInfo() {
-//        TODO("Not yet implemented")
+        map = googleMap
     }
 
     private fun loadUserInfo() {
-//        TODO("Not yet implemented")
+        // TODO 사용할 일이 있으면 불러서 사용하자
     }
+
+    private fun loadLocationInfo() {
+        FirebaseDatabase.getInstance().reference.child("Location").apply {
+            addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    Log.i(TAG, "onDataChange")
+                    for (location in snapshot.children) {
+                        // TODO 저장할거면 array에 저장해야 합니다.
+                        val info =
+                            location.getValue(com.mungyu.foodtruck.model.Location::class.java)
+                        map.addMarker(MarkerOptions().apply {
+                            position(LatLng(info!!.latitude, info!!.longitude))
+                            title(info!!.title)
+                            snippet(info!!.description)
+                            icon(BitmapDescriptorFactory.fromResource((R.drawable.foodtruck)))
+                        })
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                }
+            })
+        }
+    }
+
 
     private fun requestPermissions() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(
