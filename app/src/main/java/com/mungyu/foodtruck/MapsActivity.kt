@@ -2,6 +2,7 @@ package com.mungyu.foodtruck
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.*
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
@@ -27,12 +28,17 @@ import com.google.firebase.database.ValueEventListener
 import com.mungyu.foodtruck.databinding.ActivityMapsBinding
 import com.tbruyelle.rxpermissions3.RxPermissions
 
+
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var map: GoogleMap
     private lateinit var binding: ActivityMapsBinding
     private var isCallCurrentPosition = false
     private lateinit var persistentBottomSheetBehavior: BottomSheetBehavior<*>
+
+    private val mapInfo = mutableMapOf<String, String>()
+    private var markerLatitude = 0.0
+    private var markerLongitude = 0.0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,7 +94,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
-        persistentBottomSheetBehavior = BottomSheetBehavior.from(binding.bottomSheetPersistent.bottomSheetPersistent)
+        persistentBottomSheetBehavior =
+            BottomSheetBehavior.from(binding.bottomSheetPersistent.bottomSheetPersistent)
         persistentBottomSheetBehavior.run {
             setBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
                 override fun onStateChanged(p0: View, state: Int) {
@@ -102,6 +109,28 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 override fun onSlide(p0: View, p1: Float) {
                 }
             })
+        }
+
+        binding.bottomSheetPersistent.edit.setOnClickListener{
+            if (markerLatitude != 0.0 && markerLongitude != 0.0) {
+                val intent = Intent(this, RegisterActivity::class.java).apply {
+                    putExtra(Const.CENTER_LATITUDE, markerLatitude)
+                    putExtra(Const.CENTER_LONGITUDE, markerLongitude)
+                    putExtra(Const.TITLE, binding.bottomSheetPersistent.title.text)
+                    putExtra(Const.DESCRIPTION, binding.bottomSheetPersistent.description.text)
+                    putExtra(
+                        Const.MAP_KEY,
+                        mapInfo[markerLatitude.toString() + markerLongitude.toString()]
+                    )
+                }
+                startActivityForResult(intent, CALLBACK_REGISTER)
+            } else {
+                Toast.makeText(
+                    this@MapsActivity,
+                    "권한이 없습니다.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -136,7 +165,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onMapReady(googleMap: GoogleMap) {
         Log.d(TAG, "onMapReady")
-        map = googleMap
+        map = googleMap.apply {
+            setOnMarkerClickListener { marker ->
+                binding.bottomSheetPersistent.run {
+                    title.text = marker?.title
+                    description.text = marker?.snippet
+                }
+                persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
+                // TODO binding.adview load 해야합니다.
+                markerLatitude = marker?.position?.latitude ?: 0.0
+                markerLongitude = marker?.position?.longitude ?: 0.0
+                false
+            }
+        }
     }
 
     private fun loadUserInfo() {
@@ -148,15 +189,16 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     Log.i(TAG, "onDataChange")
+                    mapInfo.clear()
                     for (location in snapshot.children) {
-                        // TODO 저장할거면 array에 저장해야 합니다.
                         val info =
                             location.getValue(com.mungyu.foodtruck.model.Location::class.java)
+                        mapInfo[info!!.latitude.toString() + info!!.longitude.toString()] = location.key!!
                         map.addMarker(MarkerOptions().apply {
                             position(LatLng(info!!.latitude, info!!.longitude))
                             title(info!!.title)
                             snippet(info!!.description)
-                            icon(BitmapDescriptorFactory.fromResource((R.drawable.foodtruck)))
+                            icon(BitmapDescriptorFactory.fromResource(R.drawable.location))
                         })
                     }
                 }
