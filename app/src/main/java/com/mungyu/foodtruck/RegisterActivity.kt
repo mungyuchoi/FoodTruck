@@ -100,9 +100,9 @@ class RegisterActivity : AppCompatActivity() {
     private fun initView() {
         supportActionBar?.run {
             title = if (isEdit) {
-                "편집"
+                "지점 편집"
             } else {
-                "등록"
+                "지점 등록"
             }
             setDisplayHomeAsUpEnabled(true)
         }

@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.trusted.sharing.ShareTarget.FileFormField.KEY_NAME
+import androidx.core.content.ContextCompat
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -28,6 +29,7 @@ class SplashActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash)
         initFirebase()
+        window.statusBarColor = ContextCompat.getColor(this, R.color.purple_200)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

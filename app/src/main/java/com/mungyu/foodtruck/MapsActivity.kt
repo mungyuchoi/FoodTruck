@@ -1,7 +1,6 @@
 package com.mungyu.foodtruck
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.os.Bundle
@@ -30,6 +29,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.mungyu.foodtruck.databinding.ActivityMapsBinding
 import com.tbruyelle.rxpermissions3.RxPermissions
+import java.text.SimpleDateFormat
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -39,6 +39,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var persistentBottomSheetBehavior: BottomSheetBehavior<*>
 
     private val mapInfo = mutableMapOf<String, String>()
+    private val mapDate = mutableMapOf<String, Long>()
     private var currentLatitude = 0.0
     private var currentLongitude = 0.0
     private var markerLatitude = 0.0
@@ -206,6 +207,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.bottomSheetPersistent.run {
                     title.text = marker?.title
                     description.text = marker?.snippet
+                    marker?.run {
+                        val updateDate =
+                            SimpleDateFormat("yyyy-MM-dd").format(mapDate[position.latitude.toString() + position.longitude.toString()])
+                        date.text = "최근수정날짜\n$updateDate"
+                    }
                 }
                 persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
                 binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
@@ -226,6 +232,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     Log.i(TAG, "loadLocationInfo onDataChange count:${snapshot.children.count()}")
                     mapInfo.clear()
+                    mapDate.clear()
                     map.clear()
                     map.addMarker(
                         MarkerOptions().position(
@@ -240,6 +247,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                             location.getValue(com.mungyu.foodtruck.model.Location::class.java)
                         mapInfo[info!!.latitude.toString() + info!!.longitude.toString()] =
                             location.key!!
+                        mapDate[info!!.latitude.toString() + info!!.longitude.toString()] =
+                            info.updateDate
                         map.addMarker(MarkerOptions().apply {
                             position(LatLng(info!!.latitude, info!!.longitude))
                             title(info!!.title)

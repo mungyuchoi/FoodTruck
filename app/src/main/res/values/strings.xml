@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FoodTruck</string>
+    <string name="app_name">푸드트럭</string>
     <string name="title_activity_maps">MapsActivity</string>
 
     <string name="bottom_sheet_behavior">com.google.android.material.bottomsheet.BottomSheetBehavior"</string>
