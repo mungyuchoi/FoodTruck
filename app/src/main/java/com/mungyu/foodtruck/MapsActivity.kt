@@ -1,6 +1,7 @@
 package com.mungyu.foodtruck
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.graphics.*
 import android.location.Location
@@ -76,6 +77,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
                 startActivityForResult(intent, CALLBACK_REGISTER)
             }
+            R.id.delete -> {
+                val auth = FirebaseAuth.getInstance()
+                val userRef = FirebaseDatabase.getInstance().reference.child("users")
+                userRef.orderByChild("email").equalTo(auth.currentUser?.email).ref.removeValue()
+                auth.currentUser?.delete()
+
+                val pref = applicationContext.getSharedPreferences(FOOD_TRUCK, Context.MODE_PRIVATE)
+                val editor = pref.edit()
+                editor.remove("key")
+                editor.commit()
+
+                Toast.makeText(this@MapsActivity,"계정 탈퇴되었습니다.",Toast.LENGTH_SHORT
+                ).show()
+                finish()
+            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -111,7 +127,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             })
         }
 
-        binding.bottomSheetPersistent.edit.setOnClickListener{
+        binding.bottomSheetPersistent.edit.setOnClickListener {
             if (markerLatitude != 0.0 && markerLongitude != 0.0) {
                 val intent = Intent(this, RegisterActivity::class.java).apply {
                     putExtra(Const.CENTER_LATITUDE, markerLatitude)
@@ -193,7 +209,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     for (location in snapshot.children) {
                         val info =
                             location.getValue(com.mungyu.foodtruck.model.Location::class.java)
-                        mapInfo[info!!.latitude.toString() + info!!.longitude.toString()] = location.key!!
+                        mapInfo[info!!.latitude.toString() + info!!.longitude.toString()] =
+                            location.key!!
                         map.addMarker(MarkerOptions().apply {
                             position(LatLng(info!!.latitude, info!!.longitude))
                             title(info!!.title)

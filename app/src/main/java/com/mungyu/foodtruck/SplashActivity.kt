@@ -75,7 +75,8 @@ class SplashActivity : AppCompatActivity() {
         userRef.orderByChild("email").equalTo(auth.currentUser?.email)
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    if (snapshot.children.count() > 0 && name == "unknown") {
+                    Log.i(TAG, "onDataChange count:${snapshot.children.count()}, name:$name")
+                    if (snapshot.children.count() == 0 && name == "unknown") {
                         val userRef = FirebaseDatabase.getInstance().reference.child("users").push()
                         val editor = pref.edit()
                         editor.putString("key", userRef.key)
