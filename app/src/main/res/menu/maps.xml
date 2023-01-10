@@ -6,8 +6,4 @@
         android:title="등록"
         app:showAsAction="always" />
 
-    <item
-        android:id="@+id/delete"
-        android:title="탈퇴"
-        app:showAsAction="never" />
 </menu>

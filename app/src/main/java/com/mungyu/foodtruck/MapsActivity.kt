@@ -3,16 +3,18 @@ package com.mungyu.foodtruck
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.graphics.*
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -29,7 +31,6 @@ import com.google.firebase.database.ValueEventListener
 import com.mungyu.foodtruck.databinding.ActivityMapsBinding
 import com.tbruyelle.rxpermissions3.RxPermissions
 
-
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var map: GoogleMap
@@ -38,6 +39,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var persistentBottomSheetBehavior: BottomSheetBehavior<*>
 
     private val mapInfo = mutableMapOf<String, String>()
+    private var currentLatitude = 0.0
+    private var currentLongitude = 0.0
     private var markerLatitude = 0.0
     private var markerLongitude = 0.0
 
@@ -50,12 +53,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         initView()
         initFirebase()
         initPermission()
+        initAdmob()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        Log.d(TAG,"onActivityResult requestCode: $requestCode")
         when (requestCode) {
             CALLBACK_REGISTER -> {
+//                loadLocationInfo()
                 persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
                 binding.bottomSheetPersistent.title.text = ""
                 binding.bottomSheetPersistent.description.text = ""
@@ -77,21 +83,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
                 startActivityForResult(intent, CALLBACK_REGISTER)
             }
-            R.id.delete -> {
-                val auth = FirebaseAuth.getInstance()
-                val userRef = FirebaseDatabase.getInstance().reference.child("users")
-                userRef.orderByChild("email").equalTo(auth.currentUser?.email).ref.removeValue()
-                auth.currentUser?.delete()
-
-                val pref = applicationContext.getSharedPreferences(FOOD_TRUCK, Context.MODE_PRIVATE)
-                val editor = pref.edit()
-                editor.remove("key")
-                editor.commit()
-
-                Toast.makeText(this@MapsActivity,"계정 탈퇴되었습니다.",Toast.LENGTH_SHORT
-                ).show()
-                finish()
-            }
+            // TOOD 탈퇴 처리 기능
+//            R.id.delete -> {
+//                val auth = FirebaseAuth.getInstance()
+//                val userRef = FirebaseDatabase.getInstance().reference.child("users")
+//                userRef.orderByChild("email").equalTo(auth.currentUser?.email).ref.removeValue()
+//                auth.currentUser?.delete()
+//
+//                val pref = applicationContext.getSharedPreferences(FOOD_TRUCK, Context.MODE_PRIVATE)
+//                val editor = pref.edit()
+//                editor.remove("key")
+//                editor.commit()
+//
+//                Toast.makeText(
+//                    this@MapsActivity, "계정 탈퇴되었습니다.", Toast.LENGTH_SHORT
+//                ).show()
+//                finish()
+//            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -128,7 +136,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         binding.bottomSheetPersistent.edit.setOnClickListener {
-            if (markerLatitude != 0.0 && markerLongitude != 0.0) {
+            if ((markerLatitude != 0.0 && markerLongitude != 0.0) && (markerLatitude != currentLatitude && markerLongitude != currentLongitude)) {
                 val intent = Intent(this, RegisterActivity::class.java).apply {
                     putExtra(Const.CENTER_LATITUDE, markerLatitude)
                     putExtra(Const.CENTER_LONGITUDE, markerLongitude)
@@ -143,9 +151,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 Toast.makeText(
                     this@MapsActivity,
-                    "권한이 없습니다.",
+                    "지점을 선택해주세요.",
                     Toast.LENGTH_SHORT
                 ).show()
+            }
+        }
+
+        findViewById<ImageView>(R.id.my_location).run {
+            setOnClickListener {
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(currentLatitude, currentLongitude),
+                        15f
+                    )
+                )
             }
         }
     }
@@ -168,7 +187,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                                 "onLocationChanged" + location.latitude + "," + location.longitude
                             )
                             val current = LatLng(location.latitude, location.longitude)
-                            map.addMarker(MarkerOptions().position(current).title("현재 위치"))
+                            currentLatitude = location.latitude
+                            currentLongitude = location.longitude
                             map.moveCamera(CameraUpdateFactory.newLatLngZoom(current, 15f))
                             isCallCurrentPosition = true
                         }
@@ -188,7 +208,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     description.text = marker?.snippet
                 }
                 persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
-                // TODO binding.adview load 해야합니다.
+                binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
                 markerLatitude = marker?.position?.latitude ?: 0.0
                 markerLongitude = marker?.position?.longitude ?: 0.0
                 false
@@ -204,8 +224,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         FirebaseDatabase.getInstance().reference.child("Location").apply {
             addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    Log.i(TAG, "onDataChange")
+                    Log.i(TAG, "loadLocationInfo onDataChange count:${snapshot.children.count()}")
                     mapInfo.clear()
+                    map.clear()
+                    map.addMarker(
+                        MarkerOptions().position(
+                            LatLng(
+                                currentLatitude,
+                                currentLongitude
+                            )
+                        ).title("현재 위치")
+                    )
                     for (location in snapshot.children) {
                         val info =
                             location.getValue(com.mungyu.foodtruck.model.Location::class.java)
@@ -254,6 +283,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 PERMISSIONS_REQUEST_CODE
             )
         }
+    }
+
+    private fun initAdmob() {
+        MobileAds.initialize(this) {}
+        binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
     }
 
     companion object {
