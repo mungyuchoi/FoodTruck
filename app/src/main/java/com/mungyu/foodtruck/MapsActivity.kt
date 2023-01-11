@@ -2,10 +2,14 @@ package com.mungyu.foodtruck
 
 import android.Manifest
 import android.app.Dialog
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.location.Location
 import android.net.Uri
 import android.os.Bundle
+import android.renderscript.Sampler.Value
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -13,8 +17,10 @@ import android.view.View
 import android.view.Window
 import android.widget.Button
 import android.widget.ImageView
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatButton
 import androidx.core.app.ActivityCompat
 import com.google.android.ads.nativetemplates.TemplateView
 import com.google.android.gms.ads.AdListener
@@ -37,6 +43,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.mungyu.foodtruck.databinding.ActivityMapsBinding
+import com.mungyu.foodtruck.model.RequestDelete
 import com.tbruyelle.rxpermissions3.RxPermissions
 import java.text.SimpleDateFormat
 
@@ -200,16 +207,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         binding.bottomSheetPersistent.delete.setOnClickListener {
-            if ((markerLatitude != 0.0 && markerLongitude != 0.0) && (markerLatitude != currentLatitude && markerLongitude != currentLongitude)) {
-                // 등록된 키가
-            } else {
-                Toast.makeText(
-                    this@MapsActivity,
-                    "지점을 선택해주세요.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+            showDialog()
         }
+    }
+
+    private fun showDialog() {
+        val dialog = Dialog(this).apply {
+            requestWindowFeature(Window.FEATURE_NO_TITLE)
+            setCancelable(false)
+            setContentView(R.layout.custom_dialog)
+            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            findViewById<AppCompatButton>(R.id.btn_detail_delete).setOnClickListener {
+                requestDelete()
+                dismiss()
+            }
+            findViewById<AppCompatButton>(R.id.btn_detail_delete_cancel).setOnClickListener { dismiss() }
+        }
+        dialog.show()
     }
 
     private fun initPermission() {
@@ -246,19 +260,22 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         Log.d(TAG, "onMapReady")
         map = googleMap.apply {
             setOnMarkerClickListener { marker ->
-                binding.bottomSheetPersistent.run {
-                    title.text = marker?.title
-                    description.text = marker?.snippet
-                    marker?.run {
-                        val updateDate =
-                            SimpleDateFormat("yyyy-MM-dd").format(mapDate[position.latitude.toString() + position.longitude.toString()])
-                        date.text = "최근수정날짜\n$updateDate"
+                if (!(marker.position.latitude == currentLatitude && marker.position.longitude == currentLongitude)) {
+                    binding.bottomSheetPersistent.run {
+                        title.text = marker?.title
+                        description.text = marker?.snippet
+                        marker?.run {
+                            val updateDate =
+                                SimpleDateFormat("yyyy-MM-dd").format(mapDate[position.latitude.toString() + position.longitude.toString()])
+                            date.text = "최근수정날짜\n$updateDate"
+                        }
                     }
+                    persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
+                    binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
+                    markerLatitude = marker?.position?.latitude ?: 0.0
+                    markerLongitude = marker?.position?.longitude ?: 0.0
+                    false
                 }
-                persistentBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
-                binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
-                markerLatitude = marker?.position?.latitude ?: 0.0
-                markerLongitude = marker?.position?.longitude ?: 0.0
                 false
             }
         }
@@ -342,7 +359,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         //Test
         val adLoader = AdLoader.Builder(this, "ca-app-pub-3940256099942544/2247696110")
 //        val adLoader = AdLoader.Builder(this, "ca-app-pub-8549606613390169/6916450490")
-            .forNativeAd { ad->
+            .forNativeAd { ad ->
                 exitDialog?.findViewById<TemplateView>(R.id.template)?.setNativeAd(ad)
             }
             .withAdListener(object : AdListener() {
@@ -350,6 +367,118 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             .withNativeAdOptions(NativeAdOptions.Builder().build())
             .build()
         adLoader.loadAd(AdRequest.Builder().build())
+    }
+
+    private fun requestDelete() {
+        if ((markerLatitude != 0.0 && markerLongitude != 0.0) && (markerLatitude != currentLatitude && markerLongitude != currentLongitude)) {
+            // 가져온다. count 0 이면 등록한다. firstRegisterKey에 자기 key도 등록한다.
+            // count가 1이면 snapshot의 데이터중 내부 데이터 count값을 확인
+            // count값을 확인하기 전에 firstRegisterKey와 secondRegisterKey가 내 키와 일치하는 구간이 있다면 취소한다.dismiss
+            // 2면 본래 Location에 등록된 키를 삭제하고 RequestDelete에도 삭제한다.
+            // 1이하면 count값을 1 증가시켜서 update한다. 1이면 secondRegisterKey에 등록
+            val pref =
+                applicationContext.getSharedPreferences(FOOD_TRUCK, Context.MODE_PRIVATE)
+            val deleteRef = FirebaseDatabase.getInstance().reference.child("RequestDelete")
+            deleteRef.orderByChild("locationKey")
+                .equalTo(mapInfo[markerLatitude.toString() + markerLongitude.toString()])
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        Log.i(
+                            TAG,
+                            "onDataChange RequestDelete count:${snapshot.children.count()}"
+                        )
+                        if (snapshot.children.count() == 0) {
+                            val ref = deleteRef.push()
+                            ref.setValue(
+                                RequestDelete(
+                                    count = 1,
+                                    locationKey = mapInfo[markerLatitude.toString() + markerLongitude.toString()],
+                                    firstRegisterKey = pref.getString("key", null)
+                                )
+                            )
+                        } else {
+                            for (info in snapshot.children) {
+                                info.getValue(RequestDelete::class.java)?.run {
+                                    val myKey = pref.getString("key", null)
+                                    Log.i(
+                                        TAG,
+                                        "myKey: $myKey, firstRegisterKey:$firstRegisterKey, secondRegisterKey:$secondRegisterKey, count:$count"
+                                    )
+                                    if (firstRegisterKey == myKey || secondRegisterKey == myKey) {
+                                        Toast.makeText(
+                                            this@MapsActivity,
+                                            "중복 요청하셨습니다.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        return@run
+                                    }
+                                    if (count == 2) {
+                                        deleteRef.orderByChild("locationKey")
+                                            .equalTo(mapInfo[markerLatitude.toString() + markerLongitude.toString()]!!)
+                                            .addValueEventListener(object : ValueEventListener {
+                                                override fun onDataChange(snapshot: DataSnapshot) {
+                                                    for (info in snapshot.children) {
+                                                        deleteRef.child(info.key!!)
+                                                            .removeValue()
+                                                        persistentBottomSheetBehavior.state =
+                                                            BottomSheetBehavior.STATE_COLLAPSED
+                                                        binding.bottomSheetPersistent.title.text =
+                                                            ""
+                                                        binding.bottomSheetPersistent.description.text =
+                                                            ""
+                                                    }
+                                                }
+
+                                                override fun onCancelled(error: DatabaseError) {
+                                                }
+                                            })
+                                        FirebaseDatabase.getInstance().reference.child("Location")
+                                            .child(mapInfo[markerLatitude.toString() + markerLongitude.toString()]!!)
+                                            .removeValue()
+                                        Toast.makeText(
+                                            this@MapsActivity,
+                                            "지점이 삭제되었습니다.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else if (count <= 1) {
+                                        count++
+                                        secondRegisterKey = pref.getString("key", null)
+                                        deleteRef.orderByChild("locationKey")
+                                            .equalTo(mapInfo[markerLatitude.toString() + markerLongitude.toString()]!!)
+                                            .addValueEventListener(object : ValueEventListener {
+                                                override fun onDataChange(snapshot: DataSnapshot) {
+                                                    for (info in snapshot.children) {
+                                                        deleteRef.child(info.key!!)
+                                                            .setValue(this@run)
+                                                        Toast.makeText(
+                                                            this@MapsActivity,
+                                                            "삭제 요청하였습니다.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
+
+                                                override fun onCancelled(error: DatabaseError) {
+                                                }
+                                            })
+
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                    }
+
+                })
+        } else {
+            Toast.makeText(
+                this@MapsActivity,
+                "지점을 선택해주세요.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     companion object {
