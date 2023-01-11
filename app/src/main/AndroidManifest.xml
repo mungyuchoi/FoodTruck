@@ -8,6 +8,7 @@
 
     <application
         android:allowBackup="true"
+        android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -16,7 +17,7 @@
 
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8549606613390169~9003805205"/>
+            android:value="ca-app-pub-8549606613390169~9003805205" />
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"

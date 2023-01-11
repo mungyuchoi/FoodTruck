@@ -1,19 +1,28 @@
 package com.mungyu.foodtruck
 
 import android.Manifest
+import android.app.Dialog
 import android.content.Intent
 import android.location.Location
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.Window
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.google.android.ads.nativetemplates.TemplateView
+import com.google.android.gms.ads.AdListener
+import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.formats.NativeAdOptions
+import com.google.android.gms.ads.formats.UnifiedNativeAd
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -44,6 +53,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private var currentLongitude = 0.0
     private var markerLatitude = 0.0
     private var markerLongitude = 0.0
+    private var exitDialog: Dialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,7 +69,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        Log.d(TAG,"onActivityResult requestCode: $requestCode")
+        Log.d(TAG, "onActivityResult requestCode: $requestCode")
         when (requestCode) {
             CALLBACK_REGISTER -> {
 //                loadLocationInfo()
@@ -68,6 +78,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.bottomSheetPersistent.description.text = ""
             }
         }
+    }
+
+    override fun onBackPressed() {
+        exitDialog?.show()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -166,6 +180,34 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         15f
                     )
                 )
+            }
+        }
+
+        exitDialog = Dialog(this).apply {
+            requestWindowFeature(Window.FEATURE_NO_TITLE)
+            setContentView(R.layout.exit_dialog)
+            findViewById<Button>(R.id.review)?.setOnClickListener {
+                startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("market://details?id=$packageName")
+                    )
+                )
+            }
+            findViewById<Button>(R.id.exit)?.setOnClickListener {
+                finish()
+            }
+        }
+
+        binding.bottomSheetPersistent.delete.setOnClickListener {
+            if ((markerLatitude != 0.0 && markerLongitude != 0.0) && (markerLatitude != currentLatitude && markerLongitude != currentLongitude)) {
+                // 등록된 키가
+            } else {
+                Toast.makeText(
+                    this@MapsActivity,
+                    "지점을 선택해주세요.",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -297,6 +339,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun initAdmob() {
         MobileAds.initialize(this) {}
         binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
+        //Test
+        val adLoader = AdLoader.Builder(this, "ca-app-pub-3940256099942544/2247696110")
+//        val adLoader = AdLoader.Builder(this, "ca-app-pub-8549606613390169/6916450490")
+            .forNativeAd { ad->
+                exitDialog?.findViewById<TemplateView>(R.id.template)?.setNativeAd(ad)
+            }
+            .withAdListener(object : AdListener() {
+            })
+            .withNativeAdOptions(NativeAdOptions.Builder().build())
+            .build()
+        adLoader.loadAd(AdRequest.Builder().build())
     }
 
     companion object {
