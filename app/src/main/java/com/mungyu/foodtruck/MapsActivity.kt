@@ -357,8 +357,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         MobileAds.initialize(this) {}
         binding.bottomSheetPersistent.adView.loadAd(AdRequest.Builder().build())
         //Test
-        val adLoader = AdLoader.Builder(this, "ca-app-pub-3940256099942544/2247696110")
-//        val adLoader = AdLoader.Builder(this, "ca-app-pub-8549606613390169/6916450490")
+//        val adLoader = AdLoader.Builder(this, "ca-app-pub-3940256099942544/2247696110")
+        val adLoader = AdLoader.Builder(this, "ca-app-pub-8549606613390169/6916450490")
             .forNativeAd { ad ->
                 exitDialog?.findViewById<TemplateView>(R.id.template)?.setNativeAd(ad)
             }
