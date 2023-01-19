@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.trusted.sharing.ShareTarget.FileFormField.KEY_NAME
 import androidx.core.content.ContextCompat
+import androidx.core.widget.addTextChangedListener
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -19,17 +20,58 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.mungyu.foodtruck.databinding.ActivitySplashBinding
 import com.mungyu.foodtruck.model.User
+import java.util.regex.Pattern
 
 class SplashActivity : AppCompatActivity() {
     private var SPLASH_TIME = 500L
     private lateinit var auth: FirebaseAuth
+    private lateinit var binding: ActivitySplashBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_splash)
-        initFirebase()
+        binding = ActivitySplashBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         window.statusBarColor = ContextCompat.getColor(this, R.color.purple_200)
+        initLayout()
+        initFirebase()
+    }
+
+    private fun initLayout() {
+        with(binding.email) {
+            editText?.addTextChangedListener {
+                it?.let {
+                    error = if(android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches()) {
+                        null
+                    } else {
+                        getString(R.string.write_your_email)
+                    }
+                }
+            }
+        }
+        with(binding.password) {
+            editText?.addTextChangedListener {
+                it?.let {
+                    error = if(Pattern.matches("([\\w\\d]*[~!@#$%^&*()_+=:;,./<>?{}]+[\\w\\d]*)", it)) {
+                        null
+                    } else {
+                        getString(R.string.include_one_or_more_special_characters)
+                    }
+                }
+            }
+        }
+
+        // TODO
+        /*
+         * binding으로 activity_splash레이아웃 묶기
+         * currentUser가 null이면 email, password, 로그인 혹은 가입하기,  google SIgn in 버튼 보이기
+         * currentUser가 null이 아니면 nextStep
+         * email, password입력 후 로그인 혹은 가입하기 버튼 누르면 이메일 인증 진행하기
+         *   회원가입한 사용자가 있으면 그 회원으로 로그인
+         *   회원가입하지 않았으면 회원가입 진행
+         * google sign in 버튼 누르면 구글 로그인 인증 진행하기
+         */
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -62,7 +104,7 @@ class SplashActivity : AppCompatActivity() {
             if (task.isSuccessful) {
                 Toast.makeText(this@SplashActivity, "환영합니다.", Toast.LENGTH_SHORT).show()
                 registerUserInfo()
-                nextStep()
+//                nextStep()
             } else {
                 Toast.makeText(this@SplashActivity, "Login 실패", Toast.LENGTH_SHORT).show()
             }
@@ -109,7 +151,7 @@ class SplashActivity : AppCompatActivity() {
             if (currentUser == null) {
                 startActivityForResult(client.signInIntent, RC_SIGN_IN)
             } else {
-                nextStep()
+//                nextStep()
             }
         }
     }

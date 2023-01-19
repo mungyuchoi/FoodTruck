@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">푸드트럭</string>
     <string name="title_activity_maps">MapsActivity</string>
-
+    <string name="email">Email</string>
+    <string name="write_your_email">Email을 입력하세요</string>
+    <string name="write_your_password">password를 입력하세요</string>
+    <string name="password">Password</string>
+    <string name="include_one_or_more_special_characters">한개 이상의 문자 혹은 특수 문자를 입력하세요.</string>
     <string name="bottom_sheet_behavior">com.google.android.material.bottomsheet.BottomSheetBehavior"</string>
 </resources>
