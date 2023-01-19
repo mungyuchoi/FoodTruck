@@ -4,11 +4,15 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.trusted.sharing.ShareTarget.FileFormField.KEY_NAME
 import androidx.core.content.ContextCompat
+import androidx.core.view.updateLayoutParams
 import androidx.core.widget.addTextChangedListener
+import androidx.databinding.BindingAdapter
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -29,22 +33,27 @@ class SplashActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var binding: ActivitySplashBinding
 
+    private var isValidEmail: Boolean = false
+    private var isValidPassword: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.statusBarColor = ContextCompat.getColor(this, R.color.purple_200)
-        initLayout()
         initFirebase()
+        initLayout()
     }
 
     private fun initLayout() {
         with(binding.email) {
             editText?.addTextChangedListener {
                 it?.let {
-                    error = if(android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches()) {
+                    error = if (android.util.Patterns.EMAIL_ADDRESS.matcher(it).matches()) {
+                        isValidEmail = true
                         null
                     } else {
+                        isValidEmail = false
                         getString(R.string.write_your_email)
                     }
                 }
@@ -53,25 +62,68 @@ class SplashActivity : AppCompatActivity() {
         with(binding.password) {
             editText?.addTextChangedListener {
                 it?.let {
-                    error = if(Pattern.matches("([\\w\\d]*[~!@#$%^&*()_+=:;,./<>?{}]+[\\w\\d]*)", it)) {
+                    error = if (Pattern.matches(
+                            "([\\w\\d]*[~!@#$%^&*()_+=:;,./<>?{}]+[\\w\\d]*)",
+                            it
+                        )
+                    ) {
+                        isValidPassword = true
                         null
                     } else {
+                        isValidPassword = false
                         getString(R.string.include_one_or_more_special_characters)
                     }
                 }
             }
         }
+        binding.signin.setOnClickListener {
+            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id))
+                .requestEmail()
+                .build()
+            val client = GoogleSignIn.getClient(application, gso)
+            startActivityForResult(client.signInIntent, RC_SIGN_IN)
+        }
 
-        // TODO
-        /*
-         * binding으로 activity_splash레이아웃 묶기
-         * currentUser가 null이면 email, password, 로그인 혹은 가입하기,  google SIgn in 버튼 보이기
-         * currentUser가 null이 아니면 nextStep
-         * email, password입력 후 로그인 혹은 가입하기 버튼 누르면 이메일 인증 진행하기
-         *   회원가입한 사용자가 있으면 그 회원으로 로그인
-         *   회원가입하지 않았으면 회원가입 진행
-         * google sign in 버튼 누르면 구글 로그인 인증 진행하기
-         */
+        binding.submit.setOnClickListener {
+            if (!isValidEmail || !isValidPassword) {
+                Toast.makeText(this, "Email or Password를 확인해주세요.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (auth == null) {
+                Toast.makeText(this, "알 수 없는 오류로 진행할 수 없습니다.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            binding.loading.visibility = View.VISIBLE
+            auth.createUserWithEmailAndPassword(
+                binding.email.editText?.text.toString(),
+                binding.password.editText?.text.toString()
+            ).addOnCompleteListener { task ->
+                binding.loading.visibility = View.GONE
+                if (task.isSuccessful) {
+                    registerUserInfo()
+                    nextStep()
+                } else if (!task.exception?.message.isNullOrEmpty()) {
+                    Toast.makeText(this, task.exception?.message, Toast.LENGTH_LONG).show()
+                } else {
+                    signInEmail()
+                }
+            }
+        }
+    }
+
+    private fun signInEmail() {
+        auth?.signInWithEmailAndPassword(
+            binding.email.editText?.text.toString(),
+            binding.password.editText?.text.toString()
+        )
+            ?.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    nextStep()
+                } else {
+                    Toast.makeText(this, task.exception?.message, Toast.LENGTH_LONG).show()
+                }
+            }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -104,7 +156,7 @@ class SplashActivity : AppCompatActivity() {
             if (task.isSuccessful) {
                 Toast.makeText(this@SplashActivity, "환영합니다.", Toast.LENGTH_SHORT).show()
                 registerUserInfo()
-//                nextStep()
+                nextStep()
             } else {
                 Toast.makeText(this@SplashActivity, "Login 실패", Toast.LENGTH_SHORT).show()
             }
@@ -127,7 +179,7 @@ class SplashActivity : AppCompatActivity() {
                         editor.commit()
                         userRef.setValue(
                             User(
-                                name = auth.currentUser?.displayName,
+                                name = auth.currentUser?.displayName ?: auth.currentUser?.email,
                                 imageUrl = auth.currentUser?.photoUrl.toString(),
                                 email = auth.currentUser?.email
                             )
@@ -141,18 +193,17 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun initFirebase() {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
-            .requestEmail()
-            .build()
-        val client = GoogleSignIn.getClient(application, gso)
         auth = FirebaseAuth.getInstance().apply {
             Log.d(TAG, "initFirebase currentUser:$currentUser")
-            if (currentUser == null) {
-                startActivityForResult(client.signInIntent, RC_SIGN_IN)
-            } else {
-//                nextStep()
-            }
+        }
+        binding.image.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            topMargin =
+                if (auth?.currentUser != null) resources.getDimension(R.dimen.login).toInt() else
+                    resources.getDimension(R.dimen.not_login).toInt()
+        }
+        if (auth?.currentUser != null) {
+            binding.isLogin = true
+            nextStep()
         }
     }
 
